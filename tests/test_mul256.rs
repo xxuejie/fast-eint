@@ -15,8 +15,8 @@ fn test_single_mul_256() {
     let mut buf_b = vec![0u8; 32];
     rng.fill_bytes(&mut buf_b);
 
-    let a = E256::get_unsafe(&buf_a);
-    let b = E256::get_unsafe(&buf_b);
+    let a = E256::get(&buf_a);
+    let b = E256::get(&buf_b);
     let result = {
         let (lo, hi) = a.clone().widening_mul_u(b.clone());
 
@@ -44,8 +44,8 @@ fn test_batch_mul_8_256() {
     let mut buf2 = buf.clone();
 
     for i in 0..8 {
-        let a = E256::get_unsafe(&buf[i * 32..i * 32 + 32]);
-        let b = E256::get_unsafe(&buf[32 * 8 + 16 + i * 32..32 * 8 + 16 + i * 32 + 32]);
+        let a = E256::get(&buf[i * 32..i * 32 + 32]);
+        let b = E256::get(&buf[32 * 8 + 16 + i * 32..32 * 8 + 16 + i * 32 + 32]);
 
         let (lo, hi) = a.widening_mul_u(b);
 
@@ -66,8 +66,8 @@ proptest! {
     ) {
         let mut expected = vec![0u8; 64 * 32];
         for i in 0..16 {
-            let a = E256::get_unsafe(&a[i]);
-            let b = E256::get_unsafe(&b[i]);
+            let a = E256::get(&a[i]);
+            let b = E256::get(&b[i]);
 
             let (lo, hi) = a.widening_mul_u(b);
 
