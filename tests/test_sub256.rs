@@ -28,7 +28,12 @@ fn test_single_sub_256() {
 
     let mut result_buffer = [0u8; 32];
 
-    wrapping_sub_256(buf_a.as_ptr(), buf_b.as_ptr(), result_buffer.as_mut_ptr(), 1);
+    wrapping_sub_256(
+        buf_a.as_ptr(),
+        buf_b.as_ptr(),
+        result_buffer.as_mut_ptr(),
+        1,
+    );
 
     assert_eq!(result, result_buffer);
 }

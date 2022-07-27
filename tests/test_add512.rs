@@ -28,7 +28,12 @@ fn test_single_add_512() {
 
     let mut result_buffer = [0u8; 64];
 
-    wrapping_add_512(buf_a.as_ptr(), buf_b.as_ptr(), result_buffer.as_mut_ptr(), 1);
+    wrapping_add_512(
+        buf_a.as_ptr(),
+        buf_b.as_ptr(),
+        result_buffer.as_mut_ptr(),
+        1,
+    );
 
     assert_eq!(result, result_buffer);
 }

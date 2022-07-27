@@ -1,12 +1,72 @@
 use std::arch::asm;
+use std::ptr;
+
+pub fn msbc_256(a: *const u8, b: *const u8) -> bool {
+    let mut result: u64;
+    unsafe {
+        asm!(
+            "mov r8, [{1} + 0]",
+            "mov r9, [{1} + 8]",
+            "mov r10, [{1} + 16]",
+            "mov r11, [{1} + 24]",
+            "sub r8, [{2} + 0]",
+            "sbb r9, [{2} + 8]",
+            "sbb r10, [{2} + 16]",
+            "sbb r11, [{2} + 24]",
+            "sbb {0}, {0}",
+            out(reg) result,
+            in(reg) a as usize,
+            in(reg) b as usize,
+        );
+    }
+    result != 0
+}
+
+extern "C" {
+    pub fn narrowing_right_shift_512_c_impl(src: *const u64, dst: *mut u64, shift: u32, len: usize);
+}
+
+pub fn narrowing_right_shift_512_c(src: *const u8, dst: *mut u8, shift: u32, len: usize) {
+    unsafe {
+        narrowing_right_shift_512_c_impl(src as *const u64, dst as *mut u64, shift, len);
+    }
+}
 
 #[inline(never)]
-pub fn wrapping_add_512(
-    a: *const u8,
-    b: *const u8,
-    dst: *mut u8,
-    len: usize,
-) {
+pub fn narrowing_right_shift_512(src: *const u8, dst: *mut u8, shift: u32, len: usize) {
+    let shift = shift & 511;
+    let qword_shift = (shift % 64) as usize;
+    let start = (shift / 64) as usize;
+
+    for i in 0..len {
+        let src = unsafe { (src as *const u64).add(i * 8) };
+        let dst = unsafe { (dst as *mut u64).add(i * 4) };
+
+        let mut values = [0u64; 5];
+
+        let len = std::cmp::min(5, 8 - start);
+        let read_slice = ptr::slice_from_raw_parts(unsafe { src.add(start) }, len);
+        values[0..len].copy_from_slice(unsafe { &*read_slice });
+
+        if qword_shift > 0 {
+            let shift1 = values[1] << (64 - qword_shift);
+            let shift2 = values[2] << (64 - qword_shift);
+            let shift3 = values[3] << (64 - qword_shift);
+            let shift4 = values[4] << (64 - qword_shift);
+
+            values[0] = (values[0] >> qword_shift) | shift1;
+            values[1] = (values[1] >> qword_shift) | shift2;
+            values[2] = (values[2] >> qword_shift) | shift3;
+            values[3] = (values[3] >> qword_shift) | shift4;
+        }
+
+        let write_slice = ptr::slice_from_raw_parts_mut(dst, 4);
+        unsafe { &mut *write_slice }.copy_from_slice(&values[0..4]);
+    }
+}
+
+#[inline(never)]
+pub fn wrapping_add_512(a: *const u8, b: *const u8, dst: *mut u8, len: usize) {
     for i in 0..len {
         unsafe {
             asm!(
@@ -38,19 +98,14 @@ pub fn wrapping_add_512(
                 in("rcx") b as usize + i * 64,
                 in("rdi") dst as usize + i * 64,
                 clobber_abi("sysv64"),
-                clobber_abi("win64"),                
+                clobber_abi("win64"),
             );
         }
     }
 }
 
 #[inline(never)]
-pub fn wrapping_sub_256(
-    a: *const u8,
-    b: *const u8,
-    dst: *mut u8,
-    len: usize,
-) {
+pub fn wrapping_sub_256(a: *const u8, b: *const u8, dst: *mut u8, len: usize) {
     for i in 0..len {
         unsafe {
             asm!(
@@ -70,19 +125,14 @@ pub fn wrapping_sub_256(
                 in("rcx") b as usize + i * 32,
                 in("rdi") dst as usize + i * 32,
                 clobber_abi("sysv64"),
-                clobber_abi("win64"),                
+                clobber_abi("win64"),
             );
         }
     }
 }
 
 #[inline(never)]
-pub fn wrapping_add_256(
-    a: *const u8,
-    b: *const u8,
-    dst: *mut u8,
-    len: usize,
-) {
+pub fn wrapping_add_256(a: *const u8, b: *const u8, dst: *mut u8, len: usize) {
     for i in 0..len {
         unsafe {
             asm!(
@@ -93,7 +143,7 @@ pub fn wrapping_add_256(
                 "add r8, [rcx + 0]",
                 "adc r9, [rcx + 8]",
                 "adc r10, [rcx + 16]",
-                "adc r11, [rcx + 24]",                
+                "adc r11, [rcx + 24]",
                 "mov [rdi + 0], r8",
                 "mov [rdi + 8], r9",
                 "mov [rdi + 16], r10",
@@ -102,7 +152,7 @@ pub fn wrapping_add_256(
                 in("rcx") b as usize + i * 32,
                 in("rdi") dst as usize + i * 32,
                 clobber_abi("sysv64"),
-                clobber_abi("win64"),                
+                clobber_abi("win64"),
             );
         }
     }
