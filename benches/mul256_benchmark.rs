@@ -1,6 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use eint::{Eint, E256, E512};
-use fast_eint::{narrowing_right_shift_512, narrowing_right_shift_512_c, widening_mul_256};
+use fast_eint::{
+    narrowing_right_shift_512, narrowing_right_shift_512_c, widening_mul_256, wrapping_mul_256,
+};
 use rand_chacha::{
     rand_core::{RngCore, SeedableRng},
     ChaCha20Rng,
@@ -126,6 +128,48 @@ pub fn normal_batch_narrowing_right_shift_512_benchmark(c: &mut Criterion) {
     });
 }
 
+pub fn fast_batch_wrapping_mul256_benchmark(c: &mut Criterion) {
+    c.bench_function("fast batch wrapping mul256", |b| {
+        let mut rng = ChaCha20Rng::seed_from_u64(10000);
+        let mut buf_a = vec![0u8; 32 * BATCH_RUNS];
+        let mut buf_b = vec![0u8; 32 * BATCH_RUNS];
+        let mut buf_c = vec![0u8; 32 * BATCH_RUNS];
+        rng.fill_bytes(&mut buf_a);
+        rng.fill_bytes(&mut buf_b);
+
+        b.iter(|| {
+            wrapping_mul_256(
+                buf_a.as_ptr(),
+                buf_b.as_ptr(),
+                buf_c.as_mut_ptr(),
+                BATCH_RUNS,
+            );
+        })
+    });
+}
+
+pub fn normal_batch_wrapping_mul256_benchmark(c: &mut Criterion) {
+    c.bench_function("normal batch wrapping mul256", |b| {
+        let mut rng = ChaCha20Rng::seed_from_u64(10000);
+        let mut buf_a = vec![0u8; 32 * BATCH_RUNS];
+        let mut buf_b = vec![0u8; 32 * BATCH_RUNS];
+        let mut buf_c = vec![0u8; 32 * BATCH_RUNS];
+        rng.fill_bytes(&mut buf_a);
+        rng.fill_bytes(&mut buf_b);
+
+        b.iter(|| {
+            for i in 0..BATCH_RUNS {
+                let a = E256::get(&buf_a[i * 32..i * 32 + 32]);
+                let b = E256::get(&buf_b[i * 32..i * 32 + 32]);
+
+                let c = a.wrapping_mul(b);
+
+                c.put(&mut buf_c[i * 32..i * 32 + 32]);
+            }
+        })
+    });
+}
+
 criterion_group!(
     benches,
     normal_single_mul256_benchmark,
@@ -135,5 +179,7 @@ criterion_group!(
     normal_batch_narrowing_right_shift_512_benchmark,
     fast_batch_narrowing_right_shift_512_benchmark,
     c_batch_narrowing_right_shift_512_benchmark,
+    normal_batch_wrapping_mul256_benchmark,
+    fast_batch_wrapping_mul256_benchmark,
 );
 criterion_main!(benches);
